@@ -27,7 +27,7 @@ fn main() -> Result<(), DiskAnnError> {
     let args: Vec<String> = env::args().collect();
 
     let fname: String;
-    if args.len() != 1 { // default file name
+    if args.len() == 1 { // default file name
         fname = String::from("./skewed-70000-euclidean.hdf5");
     }
     else { // passed in file name
