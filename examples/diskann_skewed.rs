@@ -72,58 +72,44 @@ fn main() -> Result<(), DiskAnnError> {
         .map(|pair| pair.0.clone())
         .collect();
 
-    let index_path = "diskann_skewed.db";
-    let index = if !Path::new(index_path).exists() {
-        println!(
-            "\nBuilding DiskANN index: n={}, dim={}, max_degree={}, \
-             build_beam={}, alpha={}, passes={}, extra_seeds={}",
-            train_vectors.len(),
-            train_vectors[0].len(),
-            max_degree,
-            build_beam_width,
-            alpha,
-            passes,
-            extra_seeds
-        );
+    let index_path = format!("{}_skewed.db", fname);
+    println!(
+        "\nBuilding DiskANN index: n={}, dim={}, max_degree={}, \
+         build_beam={}, alpha={}, passes={}, extra_seeds={}",
+        train_vectors.len(),
+        train_vectors[0].len(),
+        max_degree,
+        build_beam_width,
+        alpha,
+        passes,
+        extra_seeds
+    );
 
-        let params = DiskAnnParams {
-            max_degree,
-            build_beam_width,
-            alpha,
-            passes,
-            extra_seeds,
-        };
-
-        let start_cpu = ProcessTime::now();
-        let start_wall = SystemTime::now();
-
-        let idx = DiskANN::<f32, DistL2>::build_index_with_params(
-            &train_vectors,
-            DistL2 {},
-            index_path,
-            params,
-        )?;
-
-        let cpu_time: Duration = start_cpu.elapsed();
-        let wall_time = start_wall.elapsed().unwrap();
-        println!(
-            "Build complete. CPU time: {:?}, wall time: {:?}",
-            cpu_time, wall_time
-        );
-
-        idx
-    } else {
-        println!("\nIndex file {} exists, opening…", index_path);
-        let start_wall = SystemTime::now();
-        let idx = DiskANN::<f32, DistL2>::open_index_with(index_path, DistL2)?;
-        let wall_time = start_wall.elapsed().unwrap();
-        println!(
-            "Opened index: {} vectors, dim={}, metric={} in {:?}",
-            idx.num_vectors, idx.dim, idx.distance_name, wall_time
-        );
-        idx
+    let params = DiskAnnParams {
+        max_degree,
+        build_beam_width,
+        alpha,
+        passes,
+        extra_seeds,
     };
 
+    let start_cpu = ProcessTime::now();
+        let start_wall = SystemTime::now();
+
+    let index = DiskANN::<f32, DistL2>::build_index_with_params(
+        &train_vectors,
+        DistL2 {},
+        &index_path,
+        params,
+    )?;
+
+    let cpu_time: Duration = start_cpu.elapsed();
+    let wall_time = start_wall.elapsed().unwrap();
+    println!(
+        "Build complete. CPU time: {:?}, wall time: {:?}",
+        cpu_time, wall_time
+    );
+    
     let index = Arc::new(index);
 
     println!(

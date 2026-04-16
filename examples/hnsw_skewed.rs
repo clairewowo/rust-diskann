@@ -42,82 +42,67 @@ pub fn main() {
     let base = "skewed70k_l2_hnsw";
     let graph_p = out_dir.join(format!("{base}.hnsw.graph"));
     let data_p = out_dir.join(format!("{base}.hnsw.data"));
-    let have_dump = graph_p.exists() && data_p.exists();
+    // let have_dump = graph_p.exists() && data_p.exists();
 
-    let mut reload_guard: Option<HnswIo> = None;
+    // let mut reload_guard: Option<HnswIo> = None;
     let mut hnsw: Hnsw<f32, DistL2>;
+    
+    // build parameters
+    let max_nb_connection = 48;
+    let nb_layer = 16;
+    let ef_c = 256;
 
-    if have_dump {
-        println!("Found existing index: {:?} and {:?}", graph_p, data_p);
+    println!(
+        "No saved index. Building new one: N={} layers={} ef_c={}",
+        nb_elem, nb_layer, ef_c
+    );
 
-        reload_guard = Some(HnswIo::new(out_dir, base));
+    let mut idx =
+        Hnsw::<f32, DistL2>::new(max_nb_connection, nb_elem, nb_layer, ef_c, DistL2 {});
 
-        let loaded: Hnsw<f32, DistL2> = reload_guard
-            .as_mut()
-            .unwrap()
-            .load_hnsw::<f32, DistL2>()
-            .expect("reload HNSW from disk");
+    let extend_flag = false;
+    info!("extend flag = {:?} ", extend_flag);
+    idx.set_extend_candidates(extend_flag);
+    idx.set_keeping_pruned(false);
+    // same as your sift example
+    idx.modify_level_scale(0.21);
 
-        hnsw = loaded;
+    let start = ProcessTime::now();
+    let now = SystemTime::now();
 
-        println!("Reloaded HNSW with {} points", hnsw.get_nb_point());
+    let data_for_par_insertion: Vec<(&[f32], usize)> = anndata
+        .train_data
+        .iter()
+        .map(|x| (x.0.as_slice(), x.1))
+        .collect();
+
+    if parallel {
+        println!(" \n parallel insertion");
+        idx.parallel_insert_slice(&data_for_par_insertion);
     } else {
-        // build parameters
-        let max_nb_connection = 48;
-        let nb_layer = 16;
-        let ef_c = 256;
-
-        println!(
-            "No saved index. Building new one: N={} layers={} ef_c={}",
-            nb_elem, nb_layer, ef_c
-        );
-
-        let mut idx =
-            Hnsw::<f32, DistL2>::new(max_nb_connection, nb_elem, nb_layer, ef_c, DistL2 {});
-
-        let extend_flag = false;
-        info!("extend flag = {:?} ", extend_flag);
-        idx.set_extend_candidates(extend_flag);
-        idx.set_keeping_pruned(false);
-        // same as your sift example
-        idx.modify_level_scale(0.21);
-
-        let start = ProcessTime::now();
-        let now = SystemTime::now();
-
-        let data_for_par_insertion: Vec<(&[f32], usize)> = anndata
-            .train_data
-            .iter()
-            .map(|x| (x.0.as_slice(), x.1))
-            .collect();
-
-        if parallel {
-            println!(" \n parallel insertion");
-            idx.parallel_insert_slice(&data_for_par_insertion);
-        } else {
-            println!(" \n serial insertion");
-            for d in data_for_par_insertion {
-                idx.insert_slice(d);
-            }
+        println!(" \n serial insertion");
+        for d in data_for_par_insertion {
+            idx.insert_slice(d);
         }
-
-        let cpu_time: Duration = start.elapsed();
-
-        match idx.file_dump(out_dir, base) {
-            Ok(dump_base) => {
-                println!("HNSW index saved as: {}.hnsw.graph / .hnsw.data", dump_base);
-            }
-            Err(e) => eprintln!("HNSW file_dump failed: {e}"),
-        }
-
-        println!(
-            "\n hnsw data insertion cpu time  {:?}  system time {:?} ",
-            cpu_time,
-            now.elapsed()
-        );
-
-        hnsw = idx;
     }
+
+    let cpu_time: Duration = start.elapsed();
+
+    match idx.file_dump(out_dir, base) {
+        Ok(dump_base) => {
+            println!("HNSW index saved as: {}.hnsw.graph / .hnsw.data", dump_base);
+        }
+        Err(e) => eprintln!("HNSW file_dump failed: {e}"),
+    }
+
+    println!(
+        "\n hnsw data insertion cpu time  {:?}  system time {:?} ",
+        cpu_time,
+        now.elapsed()
+    );
+
+    hnsw = idx;
+    
 
     hnsw.set_searching_mode(true);
     hnsw.dump_layer_info();
