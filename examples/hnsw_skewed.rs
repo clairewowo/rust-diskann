@@ -56,6 +56,8 @@ pub fn main() {
         max_nb_connection = args[2].parse().unwrap();
     }
     
+    println!("Using {} max neighbors", max_nb_connection);
+    
     let nb_layer = 16;
     let ef_c = 256;
 
