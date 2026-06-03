@@ -49,10 +49,10 @@ pub fn main() {
     
     // build parameters
     let max_nb_connection: usize;
-    if args.len() != 2 {
+    if args.len() == 2 {
         max_nb_connection = 48;
     }
-    else {
+    else { // third argument for neighbors
         max_nb_connection = args[2].parse().unwrap();
     }
     
